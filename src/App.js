@@ -100,11 +100,14 @@ class App extends Component {
 	}
 
 	signOut() {
-		this.setState({
-			authenticated: false,
-			profile: null,
+		const GoogleAuth = window.gapi.auth2.getAuthInstance();
+		GoogleAuth.signOut().then(() => {
+			this.setState({
+				authenticated: false,
+				profile: null,
+			});
+			this.renderSignInButton();
 		});
-		this.renderSignInButton();
 	}
 
 	render() {
