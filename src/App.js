@@ -1,70 +1,135 @@
 import React, { Component } from 'react';
 import Navigator from './Navigator';
+import {
+	Navbar,
+	Alignment,
+	Card,
+	Callout,
+	AnchorButton,
+	Icon,
+	Position,
+	Tooltip,
+} from '@blueprintjs/core';
+import { IconNames } from '@blueprintjs/icons';
 import './index.css';
 
-const CLIENT_ID =
-	'523150784546-0oc3p34t4fo0iha2jv2tv55ke2ddj5m2.apps.googleusercontent.com';
-const SCOPES = 'https://www.googleapis.com/auth/spreadsheets.readonly';
+const SCOPES = [
+	'https://www.googleapis.com/auth/spreadsheets.readonly',
+	'profile',
+];
+
+class Nav extends Component {
+	signOut() {
+		const GoogleAuth = window.gapi.auth2.getAuthInstance();
+		GoogleAuth.signOut().then(() => {
+			this.props.signOut();
+		});
+	}
+
+	render() {
+		const profileImg = this.props.profile && this.props.profile.getImageUrl();
+
+		return (
+			<Navbar>
+				<Navbar.Group align={Alignment.LEFT}>
+					<img src="favicon.ico" width="100" heigth="100" alt="" />
+					<Navbar.Divider />
+					<Navbar.Heading>Athletia Partner Reports</Navbar.Heading>
+				</Navbar.Group>
+				{this.props &&
+					this.props.authenticated && (
+					<Navbar.Group align={Alignment.RIGHT}>
+						<img
+							style={{ marginRight: '5px' }}
+							src={profileImg && profileImg}
+							width="40"
+							heigth="40"
+							alt=""
+						/>
+						{this.props.profile && this.props.profile.getName()}
+
+						<Tooltip content="Google Logout" position={Position.BOTTOM}>
+							<AnchorButton onClick={this.signOut.bind(this)} minimal>
+								<Icon icon={IconNames.LOG_OUT} />
+							</AnchorButton>
+						</Tooltip>
+					</Navbar.Group>
+				)}
+			</Navbar>
+		);
+	}
+}
 
 class App extends Component {
 	constructor(props) {
 		super(props);
 		this.state = {
 			authenticated: false,
-			error: null,
-			loading: false,
+			profile: null,
 		};
-
-		this.authenticate = this.authenticate.bind(this);
-		this.checkAuth = this.checkAuth.bind(this);
 	}
 
-	componentWillMount() {
-		this.setState({ loading: true });
-		window.gapi.load('client', () => {
-			this.checkAuth(true, this.handleAuth.bind(this));
+	componentDidMount() {
+		// load client for google spreadsheets api
+		// load auth2 scope management
+		// load signin for the signin button
+		window.gapi.load('auth2:client:signin2', () => {
+			this.renderSignInButton();
 		});
 	}
 
-	authenticate(e) {
-		e.preventDefault();
-		this.checkAuth(false, this.handleAuth.bind(this));
+	renderSignInButton() {
+		window.gapi.signin2.render('g-signin2', {
+			scope: SCOPES.join(' '),
+			width: 120,
+			height: 35,
+			longtitle: false,
+			prompt: 'select_account',
+			theme: 'dark',
+			onsuccess: this.authenticate.bind(this),
+			onfaiure: this.setState({ error: { message: 'Error while logging in' } }),
+		});
 	}
 
-	checkAuth(immediate, callback) {
-		window.gapi.auth.authorize(
-			{
-				client_id: CLIENT_ID,
-				scope: SCOPES,
-				immediate,
-			},
-			callback
-		);
+	authenticate() {
+		const GoogleAuth = window.gapi.auth2.getAuthInstance();
+		const currentUser = GoogleAuth.currentUser && GoogleAuth.currentUser.get();
+
+		const profile = currentUser.getBasicProfile();
+		this.setState({ authenticated: true, profile, loading: false });
 	}
 
-	handleAuth(authResult) {
-		if (authResult && !authResult.error) {
-			this.setState({
-				authenticated: true,
-				loading: false,
-			});
-		} else {
-			this.setState({
-				authenticated: false,
-				loading: false,
-			});
-		}
+	signOut() {
+		this.setState({
+			authenticated: false,
+			profile: null,
+		});
+		this.renderSignInButton();
 	}
 
 	render() {
-		if (this.state.loading) return <div className="loader" />;
-		if (!this.state.error) {
-			if (!this.state.authenticated) {
-				return <button onClick={this.authenticate}>Login</button>;
-			}
-			return <Navigator />;
-		}
-		return <p>{this.state.error.result.error.message}</p>;
+		return (
+			<div>
+				<Nav
+					signOut={this.signOut.bind(this)}
+					authenticated={this.state.authenticated}
+					profile={this.state.profile}
+				/>
+				{!this.state.authenticated ? (
+					<div>
+						<Card style={{ marginTop: '5px' }}>
+							<Callout title={'Login with Google'} intent="primary">
+								Before we can give you access to your report, we need you to log
+								in with your Google Account.
+								<div style={{ marginTop: '10px' }} id="g-signin2" />
+							</Callout>
+						</Card>
+					</div>
+				) : (
+					<Navigator />
+				)}
+			</div>
+		);
 	}
 }
 
